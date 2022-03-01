@@ -54,6 +54,14 @@ END
 // remains consistent on all systems.
 IDI_ICON1               ICON                    "rcs\\cjw-48.ico"
 
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DLL
+//
+
+IDR_DLL1                DLL                     "C:\\Users\\Leo Liao\\source\\repos\\ClassOut\\Release\\helperDll.dll"
+
 #endif    // 中文(简体，中国) resources
 /////////////////////////////////////////////////////////////////////////////
 
