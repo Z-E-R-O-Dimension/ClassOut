@@ -5,9 +5,14 @@
 #include <detours/detours.h>
 #include <conio.h>
 #include <assert.h>
+#include <chrono>
+#include <Shlwapi.h>
+#include <thread>
 #include "../include/win32Obj.h"
 #include "../include/notifyStruct.h"
 #pragma comment(lib,"Version.lib")
+#pragma comment(lib,"Shlwapi.lib")
+using namespace std::chrono_literals;
 
 BOOL WINAPI HandlerRoutine(DWORD dwCtrlType) {
 	switch (dwCtrlType)
@@ -22,6 +27,7 @@ BOOL WINAPI HandlerRoutine(DWORD dwCtrlType) {
 	return false;
 }
 
+#pragma region Qt_Declearations
 #define Q_ASSERT assert
 typedef int QBasicAtomicInt;
 typedef double qreal;
@@ -108,6 +114,7 @@ public:
 	typedef QTypedArrayData<char> Data;
 	Data* d;
 };
+#pragma endregion
 
 #pragma region Detour_Functions
 // help function
@@ -152,6 +159,10 @@ int __fastcall Detour_CommandClassroomState_getOnStageUpperLimite(void*, int);
 decltype(Detour_CommandUserSettings_getOnStageShortOfNumber)* Trampoline_CommandUserSettings_getOnStageShortOfNumber = nullptr;
 decltype(Detour_CommandClassroomState_getOnStageUpperLimite)* Trampoline_CommandClassroomState_getOnStageUpperLimite = nullptr;
 
+// User32.dll
+// 2313 328 0002B120 SetCursor
+HCURSOR __stdcall Detour_SetCursor(HCURSOR hCursor);
+decltype(Detour_SetCursor)* Trampoline_SetCursor = nullptr;
 #pragma endregion
 
 template<typename dst_type, typename src_type>
@@ -168,7 +179,6 @@ void printQString(const QString& qstr) {
 	int ret = QString_toWCharArray(&qstr, 0, wstr);
 	printf("[%d]%ls\n", ret, wstr);
 }
-
 
 void getVersion(LPCWSTR szVersionFile) {
 	DWORD  verHandle = 0;
@@ -205,9 +215,9 @@ void getVersion(LPCWSTR szVersionFile) {
 	}
 }
 
-HMODULE hQt5GuiDll = NULL, hQt5CoreDll = NULL, hCommEngineDll = NULL;
-#define EXTRACTINFO(hModule,funName,decName) { &hModule, decName, &(PVOID&)Trampoline_##funName, (void*)Detour_##funName }
-struct FuncInfo {
+HMODULE hQt5GuiDll = NULL, hQt5CoreDll = NULL, hCommEngineDll = NULL, hUser32Dll = NULL;
+#define EXTRACTINFO(hModule, funName, decName) { &hModule, decName, &(PVOID&)Trampoline_##funName, (void*)Detour_##funName }
+struct HookInfo {
 	HMODULE* hModule;
 	LPCSTR decoratedName;
 	PVOID* ppTrampoline;
@@ -223,6 +233,7 @@ struct FuncInfo {
 	EXTRACTINFO(hQt5GuiDll, QPainter_drawText_71, "?drawText@QPainter@@QAEXHHHHHABVQString@@PAVQRect@@@Z"),
 	//EXTRACTINFO(hCommEngineDll, CommandUserSettings_getOnStageShortOfNumber, "?getOnStageShortOfNumber@CommandUserSettings@@QAEHXZ"),
 	//EXTRACTINFO(hCommEngineDll, CommandClassroomState_getOnStageUpperLimite, "?getOnStageUpperLimite@CommandClassroomState@@QAEHXZ"),
+	EXTRACTINFO(hUser32Dll, SetCursor, "SetCursor"),
 };
 void GetProcAddrMulti() {
 	for (auto& obj : info) {
@@ -240,21 +251,37 @@ void DetourDetachMulti() {
 	}
 }
 
-// globals
-win32Event evtNotify(L"classOutEvent");
-win32SharedMemory smNotify(L"classOutSM");
-notifyStruct* pNotify = NULL;
+#pragma comment(linker,"/section:.Shared,rws")
+#pragma data_seg("Shared")
+notifyStruct g_notify{ 0 };
+#pragma data_seg()
+
+enum dllRole {
+	ROLE_NAN,
+	ROLE_CLASSOUT,
+	ROLE_CLASSIN
+} role = ROLE_NAN;
+
+DWORD WINAPI messageThread(LPVOID param) {
+	MSG msg;
+	while (GetMessageW(&msg, NULL, 0, 0)) {
+
+	}
+	return 0;
+}
 
 void drawText_impl(QString const& str) {
 	wchar_t wstr[2048]{ 0 };
 	int len = QString_toWCharArray(&str, 0, wstr);
 	if (wcscmp(wstr, L"你下台了，暂时无法与大家互动") == 0) {
-		wcscpy(pNotify->string, wstr);
-		evtNotify.set();
+		//wcscpy(pNotify->string, wstr);
+		//evtNotify.set();
 	}
 }
 __declspec(dllexport)
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
+	wchar_t moduleName[260]{ 0 };
+	LPCWSTR fileName = NULL;
 	switch (ul_reason_for_call)
 	{
 	case DLL_THREAD_ATTACH:
@@ -269,37 +296,68 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 		freopen("CONOUT$", "w", stderr);
 		setlocale(LC_ALL, "");
 		*/
-		if (!(evtNotify.create() && smNotify.create(sizeof(notifyStruct)))) {
-			MessageBoxW(NULL, L"There is another instance running.", L"Error", MB_ICONERROR | MB_OK);
-			ExitProcess(1);
-		}
-		hQt5GuiDll = LoadLibraryW(L"Qt5Gui.dll");
-		hQt5CoreDll = LoadLibraryW(L"Qt5Core.dll");
-		hCommEngineDll = LoadLibraryW(L"CommEngine.dll");
-		getVersion(L"Qt5Gui.dll");
-		getVersion(L"Qt5Core.dll");
-		GetProcAddrMulti();
-		getProcAddr(hQt5CoreDll, "?toWCharArray@QString@@QBEHPA_W@Z", QString_toWCharArray);
-		DetourRestoreAfterWith();
-		DetourTransactionBegin();
-		DetourUpdateThread(GetCurrentThread());
-		DetourAttachMulti();
-		if (DetourTransactionCommit() != NO_ERROR) {
-			printf("detourAttach failed\n");
+
+		GetModuleFileNameW(NULL, moduleName, 260);
+		fileName = PathFindFileNameW(moduleName);
+		if (wcscmp(fileName, L"ClassOut.exe") == 0)
+			role = ROLE_CLASSOUT;
+		else if (wcscmp(fileName, L"ClassIn.exe") == 0)
+			role = ROLE_CLASSIN;
+		else
+			role = ROLE_NAN;
+		wprintf(L"Loaded by: %s,%d\n", fileName, role);
+		switch (role) {
+		case ROLE_CLASSOUT:
+
+			break;
+		case ROLE_CLASSIN:
+			hQt5GuiDll = LoadLibraryW(L"Qt5Gui.dll");
+			hQt5CoreDll = LoadLibraryW(L"Qt5Core.dll");
+			hCommEngineDll = LoadLibraryW(L"CommEngine.dll");
+			hUser32Dll = LoadLibraryW(L"User32.dll");
+			getVersion(L"Qt5Gui.dll");
+			getVersion(L"Qt5Core.dll");
+			GetProcAddrMulti();
+			getProcAddr(hQt5CoreDll, "?toWCharArray@QString@@QBEHPA_W@Z", QString_toWCharArray);
+			DetourRestoreAfterWith();
+			DetourTransactionBegin();
+			DetourUpdateThread(GetCurrentThread());
+			DetourAttachMulti();
+			if (DetourTransactionCommit() != NO_ERROR) {
+				printf("detourAttach failed\n");
+			}
+			g_notify.classinPresent = true;
+			break;
+		default:
+			break;
 		}
 		break;
 	case DLL_PROCESS_DETACH:
-		DetourTransactionBegin();
-		DetourUpdateThread(GetCurrentThread());
-		DetourDetachMulti();
-		if (DetourTransactionCommit() != NO_ERROR) {
-			printf("detourDetach failed\n");
+		switch (role) {
+		case ROLE_CLASSOUT:
+
+			break;
+		case ROLE_CLASSIN:
+			DetourTransactionBegin();
+			DetourUpdateThread(GetCurrentThread());
+			DetourDetachMulti();
+			if (DetourTransactionCommit() != NO_ERROR) {
+				printf("detourDetach failed\n");
+			}
+			FreeLibrary(hUser32Dll);
+			FreeLibrary(hQt5CoreDll);
+			FreeLibrary(hQt5GuiDll);
+			FreeLibrary(hCommEngineDll);
+			g_notify.classinPresent = false;
+			break;
+		default:
+			break;
 		}
 		break;
 	}
 	return TRUE;
 }
-
+#pragma region Detour_Functions
 void __fastcall Detour_QPainter_drawText_21(void* pThis, int edx, QPoint const& p, class QString const& s) {
 	drawText_impl(s);
 	Trampoline_QPainter_drawText_21(pThis, edx, p, s);
@@ -342,3 +400,27 @@ int __fastcall Detour_CommandClassroomState_getOnStageUpperLimite(void* pthis, i
 	printf("in Detour_CommandClassroomState_getOnStageUpperLimite: ret=%d", ret);
 	return ret;
 }
+HCURSOR __stdcall Detour_SetCursor(HCURSOR hCursor)
+{
+	HCURSOR ret;
+	ret = Trampoline_SetCursor(hCursor);
+	switch ((uintptr_t)hCursor) {
+		//00010003 -> arrow
+		//0001001F -> hand
+		//00010005 -> ibeam
+	case 0x00010003:
+		PostMessageW(g_notify.classoutWnd, NOTIFY_CURSOR_CHANGED, (WPARAM)IDC_ARROW, NULL);
+		break;
+	case 0x0001001F:
+		PostMessageW(g_notify.classoutWnd, NOTIFY_CURSOR_CHANGED, (WPARAM)IDC_HAND, NULL);
+		break;
+	case 0x00010005:
+		PostMessageW(g_notify.classoutWnd, NOTIFY_CURSOR_CHANGED, (WPARAM)IDC_IBEAM, NULL);
+		break;
+	default:
+		break;
+	}
+	printf("\n");
+	return ret;
+}
+#pragma endregion

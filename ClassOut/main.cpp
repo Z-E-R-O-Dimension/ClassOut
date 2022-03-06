@@ -117,6 +117,10 @@ private:
 		CoInitialize(NULL);
 		systemScale = getZoom();
 		SetProcessDPIAware();
+		exportDll();
+		evtNotify.reg(L"classOutEvent");
+		smNotify.reg(L"classOutSM");
+
 		// register window class
 		WNDCLASSEXW wcex{ 0 };
 		wcex.cbSize = sizeof(WNDCLASSEX);
@@ -137,8 +141,10 @@ private:
 		viewWindow.hMenuRoot = CreateMenu();
 		viewWindow.hMenuClassOut = CreatePopupMenu();
 		viewWindow.hMenuClassIn = CreatePopupMenu();
+		viewWindow.hMenuConnect = CreatePopupMenu();
 		AppendMenuW(viewWindow.hMenuRoot, MF_POPUP, (UINT_PTR)viewWindow.hMenuClassOut, L"ClassOut");
 		AppendMenuW(viewWindow.hMenuRoot, MF_POPUP, (UINT_PTR)viewWindow.hMenuClassIn, L"ClassIn");
+		AppendMenuW(viewWindow.hMenuRoot, MF_POPUP, (UINT_PTR)viewWindow.hMenuConnect, L"连接");
 		AppendMenuW(viewWindow.hMenuClassIn, MF_STRING, idMenu, L"刷新");
 		AppendMenuW(viewWindow.hMenuClassIn, MF_STRING, idMenu + 1, L"隐藏");
 		AppendMenuW(viewWindow.hMenuClassIn, MF_STRING, idMenu + 2, L"置底");
@@ -151,7 +157,8 @@ private:
 		AppendMenuW(viewWindow.hMenuClassIn, MF_STRING, idMenu + 9, L"200%");
 		AppendMenuW(viewWindow.hMenuClassIn, MF_STRING, idMenu + 10, L"225%");
 		AppendMenuW(viewWindow.hMenuClassOut, MF_STRING, idMenu + 100, L"置顶");
-		AppendMenuW(viewWindow.hMenuClassOut, MF_STRING, idMenu + 101, L"Start ClassIn With Dll");
+		AppendMenuW(viewWindow.hMenuConnect, MF_STRING, idMenu + 201, L"Start ClassIn With Dll");
+		AppendMenuW(viewWindow.hMenuConnect, MF_STRING, idMenu + 202, L"Connect");
 		// create window
 		viewWindow.hWnd = CreateWindowW(
 			L"ClassOutMain", L"ClassOut", WS_OVERLAPPEDWINDOW | WS_HSCROLL | WS_VSCROLL,
@@ -308,6 +315,11 @@ private:
 		return DefWindowProcW(hWnd, message, wParam, lParam);
 
 	}
+	LRESULT onKeyboardMsg(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
+		if (classinWindow.attached)
+			SendMessageW(classinWindow.hWnd, message, wParam, lParam);
+		return DefWindowProcW(hWnd, message, wParam, lParam);
+	}
 	LRESULT onClipboardMsg(HWND hWnd, UINT message) {
 		if (classinWindow.attached)
 			SendMessageW(classinWindow.hWnd, message, 0, 0);
@@ -449,9 +461,19 @@ private:
 				SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_SHOWWINDOW | SWP_NOSIZE | SWP_NOMOVE);
 			}
 			break;
-		case idMenu + 101://menu start classin
-			exportDll();
+		case idMenu + 201://menu start classin
 			startClassInWithDll();
+			break;
+		case idMenu + 202://menu connect
+			if (!(evtNotify.open() && smNotify.open())) {
+				MessageBoxW(viewWindow.hWnd, L"ClassIn not present.", L"Error", MB_ICONEXCLAMATION | MB_OK);
+			}
+			pNotify = (notifyStruct*)smNotify.map();
+			// TODO: exception handling
+			assert(pNotify->classinPresent);
+			pNotify->classoutPresent = true;
+			pNotify->classoutWnd = viewWindow.hWnd;
+			SetWindowTextW(viewWindow.hWnd, L"ClassIn 释放器：ClassIn 已连接");
 			break;
 		default:
 			return -1;
@@ -463,6 +485,11 @@ private:
 		if (classinWindow.attached)
 			return SendMessageW(classinWindow.hWnd, message, wParam, lParam);
 		return DefWindowProcW(hWnd, message, wParam, lParam);
+	}
+	LRESULT onClassInCursorChanged(HWND hWnd, LPWSTR cursor) {
+		trace(L"in cursor changed\n");
+		SetCursor(LoadCursorW(hInstance, cursor));
+		return TRUE;
 	}
 
 	void invalidate() {
@@ -755,7 +782,8 @@ private:
 		}
 		PathCombineA(dir, tempDir, "ClassOut\\helperDll.dll");
 		attr = GetFileAttributesA(dir);
-		if (attr == INVALID_FILE_ATTRIBUTES) {
+		//if (attr == INVALID_FILE_ATTRIBUTES) {
+		{
 			HRSRC hRs = FindResourceW(hInstance, MAKEINTRESOURCEW(IDR_DLL1), L"DLL");
 			HGLOBAL hGlo = LoadResource(hInstance, hRs);
 			void* pData = LockResource(hGlo);
@@ -766,6 +794,7 @@ private:
 			FreeResource(hGlo);
 		}
 		strcpy(dllFile, dir);
+		hHelperDll = LoadLibraryA(dllFile);
 	}
 	void startClassInWithDll() {
 		STARTUPINFOW si;
@@ -848,6 +877,11 @@ private:
 
 		return cxPhysical * 1.0 / cxLogical;
 	}
+	static DWORD WINAPI classOutRoutine(LPVOID param) {
+		while (pInstance->evtNotify.wait()) {
+
+		}
+	}
 
 	struct ViewWrapper {
 		HWND hWnd = NULL;
@@ -857,7 +891,7 @@ private:
 		PointWrapper viewPos{ 0,0 };
 		bool topmost = false;
 		double viewScale = 1.;
-		HMENU hMenuRoot = NULL, hMenuClassOut = NULL, hMenuClassIn = NULL;
+		HMENU hMenuRoot = NULL, hMenuClassOut = NULL, hMenuClassIn = NULL, hMenuConnect = NULL;
 	}viewWindow;
 	struct ClassInWrapper {
 		const LONG xHide = 6666, yHide = 6666;
@@ -872,12 +906,17 @@ private:
 		bool initialFocusMode = false;
 	}classinWindow;
 
+	win32Event evtNotify;
+	win32SharedMemory smNotify;
+	notifyStruct* pNotify = NULL;
+	bool connected = false;
 	HWND hButton[3];
 	CONST static UINT_PTR idTimer = 2233;
 	CONST static UINT_PTR idMenu = 4233;
 	CONST static INT idHotkey = 5233;
 	char dllFile[MAX_PATH]{ 0 };
 	HINSTANCE hInstance;
+	HMODULE hHelperDll;
 	HFONT hFontMSYH32;
 	double systemScale = 1.;
 	static ClassOutApp* pInstance;
@@ -940,9 +979,14 @@ LRESULT ClassOutApp::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		break;
+	case WM_KEYDOWN:
+	case WM_KEYUP:
+		return pInstance->onKeyboardMsg(hWnd, message, wParam, lParam);
 	case WM_IME_CHAR:
-	case WM_CHAR:
+	//case WM_CHAR:
 		return pInstance->onChar(hWnd, message, wParam, lParam);
+	case NOTIFY_CURSOR_CHANGED:
+		return pInstance->onClassInCursorChanged(hWnd, (LPWSTR)wParam);
 	default:
 		return DefWindowProcW(hWnd, message, wParam, lParam);
 	}
