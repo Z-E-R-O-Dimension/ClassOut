@@ -96,7 +96,7 @@ Misuse could lead to unexpected results.
 
 ## 关于图标
 
-![年轻又帅气而富有师德的cjw 作于课上](ClassOut\rcs\icon.png#pic_center "年轻又帅气而富有师德的cjw 作于课上")  
+![年轻又帅气而富有师德的cjw 作于课上](ClassOut/rcs/icon.png#pic_center "年轻又帅气而富有师德的cjw 作于课上")  
 
 ## 一些话
 
