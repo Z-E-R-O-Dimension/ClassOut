@@ -98,7 +98,7 @@ Misuse could lead to unexpected results.
 
 <div align="center">
   <img src="ClassOut/rcs/icon.png">
-  <p>年轻又帅气而富有师德的cjw 作于课上</p>
+  <p>《画一个夏天穿的》 年轻又帅气而富有师德的cjw 作于课上</p>
 </div>
 
 ## 一些话
