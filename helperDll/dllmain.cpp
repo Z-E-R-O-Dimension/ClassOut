@@ -251,7 +251,7 @@ void DetourDetachMulti() {
 	}
 }
 
-#pragma comment(linker,"/section:.Shared,rws")
+#pragma comment(linker,"/section:Shared,rws")
 #pragma data_seg("Shared")
 notifyStruct g_notify{ 0 };
 #pragma data_seg()
@@ -273,6 +273,7 @@ DWORD WINAPI messageThread(LPVOID param) {
 void drawText_impl(QString const& str) {
 	wchar_t wstr[2048]{ 0 };
 	int len = QString_toWCharArray(&str, 0, wstr);
+	wprintf(L"[%d]%s\n", len, wstr);
 	if (wcscmp(wstr, L"你下台了，暂时无法与大家互动") == 0) {
 		//wcscpy(pNotify->string, wstr);
 		//evtNotify.set();
@@ -288,14 +289,14 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 	case DLL_THREAD_DETACH:
 		break;
 	case DLL_PROCESS_ATTACH:
-		/*
+		
 		AllocConsole();
 		SetConsoleCtrlHandler(HandlerRoutine, TRUE);
 		freopen("CONIN$", "r", stdin);
 		freopen("CONOUT$", "w", stdout);
 		freopen("CONOUT$", "w", stderr);
 		setlocale(LC_ALL, "");
-		*/
+		
 
 		GetModuleFileNameW(NULL, moduleName, 260);
 		fileName = PathFindFileNameW(moduleName);

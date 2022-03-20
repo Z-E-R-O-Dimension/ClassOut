@@ -4,6 +4,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 17.1.32210.238
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ClassOut", "ClassOut\ClassOut.vcxproj", "{84C4BBB8-5AF7-44C5-B1EA-DEF61C6AAC9F}"
+	ProjectSection(ProjectDependencies) = postProject
+		{08401FC2-1797-4187-B4D7-A3D66A8DB760} = {08401FC2-1797-4187-B4D7-A3D66A8DB760}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "helperDll", "helperDll\helperDll.vcxproj", "{08401FC2-1797-4187-B4D7-A3D66A8DB760}"
 EndProject

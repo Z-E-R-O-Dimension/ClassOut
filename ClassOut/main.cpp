@@ -144,12 +144,12 @@ private:
 		viewWindow.hMenuConnect = CreatePopupMenu();
 		AppendMenuW(viewWindow.hMenuRoot, MF_POPUP, (UINT_PTR)viewWindow.hMenuClassOut, L"ClassOut");
 		AppendMenuW(viewWindow.hMenuRoot, MF_POPUP, (UINT_PTR)viewWindow.hMenuClassIn, L"ClassIn");
-		AppendMenuW(viewWindow.hMenuRoot, MF_POPUP, (UINT_PTR)viewWindow.hMenuConnect, L"连接");
+		AppendMenuW(viewWindow.hMenuRoot, MF_POPUP, (UINT_PTR)viewWindow.hMenuConnect, L"Connection");
 		AppendMenuW(viewWindow.hMenuClassIn, MF_STRING, idMenu, L"刷新");
 		AppendMenuW(viewWindow.hMenuClassIn, MF_STRING, idMenu + 1, L"隐藏");
 		AppendMenuW(viewWindow.hMenuClassIn, MF_STRING, idMenu + 2, L"置底");
 		AppendMenuW(viewWindow.hMenuClassIn, MF_STRING, idMenu + 3, L"关闭");
-		AppendMenuW(viewWindow.hMenuClassIn, MF_STRING, idMenu + 4, L"专注学习模式");
+		AppendMenuW(viewWindow.hMenuClassIn, MF_STRING, idMenu + 4, L"Relevant Sizing");
 		AppendMenuW(viewWindow.hMenuClassIn, MF_STRING, idMenu + 5, L"100%");
 		AppendMenuW(viewWindow.hMenuClassIn, MF_STRING, idMenu + 6, L"125%");
 		AppendMenuW(viewWindow.hMenuClassIn, MF_STRING, idMenu + 7, L"150%");
@@ -935,7 +935,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 }
 
 LRESULT ClassOutApp::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
-	wchar_t str[2]{ 0 };
 	switch (message) {
 	case WM_CREATE:
 		return pInstance->onCreate(hWnd, (LPCREATESTRUCTW)lParam);
