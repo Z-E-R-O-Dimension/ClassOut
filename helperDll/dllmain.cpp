@@ -10,6 +10,7 @@
 #include <thread>
 #include "../include/win32Obj.h"
 #include "../include/notifyStruct.h"
+#include "../include/hookHelper.h"
 #pragma comment(lib,"Version.lib")
 #pragma comment(lib,"Shlwapi.lib")
 using namespace std::chrono_literals;
@@ -115,8 +116,8 @@ public:
 	Data* d;
 };
 #pragma endregion
+HMODULE hQt5GuiDll = NULL, hQt5CoreDll = NULL, hCommEngineDll = NULL;
 
-#pragma region Detour_Functions
 // help function
 // Qt5Core.dll
 // 7762 ?toWCharArray@QString@@QBEHPA_W@Z
@@ -132,6 +133,7 @@ int(__fastcall* QString_toWCharArray)(const QString*, int, wchar_t*);
 // 3980 ?drawText@QPainter@@QAEXABVQRectF@@HABVQString@@PAV2@@Z          
 // 3981 ?drawText@QPainter@@QAEXHHABVQString@@@Z                         
 // 3982 ?drawText@QPainter@@QAEXHHHHHABVQString@@PAVQRect@@@Z            
+/*
 void __fastcall Detour_QPainter_drawText_21(void*, int, QPoint const&, class QString const&);
 void __fastcall Detour_QPainter_drawText_22(void*, int, QPointF const&, class QString const&);
 void __fastcall Detour_QPainter_drawText_41(void*, int, QPointF const&, class QString const&, int, int);
@@ -148,22 +150,98 @@ decltype(Detour_QPainter_drawText_31)* Trampoline_QPainter_drawText_31 = nullptr
 decltype(Detour_QPainter_drawText_43)* Trampoline_QPainter_drawText_43 = nullptr;
 decltype(Detour_QPainter_drawText_32)* Trampoline_QPainter_drawText_32 = nullptr;
 decltype(Detour_QPainter_drawText_71)* Trampoline_QPainter_drawText_71 = nullptr;
-
+*/
 // CommEngine.dll
 // 519 ?getOnStageShortOfNumber@CommandUserSettings@@QAEHXZ
 // 519 public: int __thiscall CommandUserSettings::getOnStageShortOfNumber(void)
 // 520 ?getOnStageUpperLimite@CommandClassroomState@@QAEHXZ
 // 520 public: int __thiscall CommandClassroomState::getOnStageUpperLimite(void)
+/*
 int __fastcall Detour_CommandUserSettings_getOnStageShortOfNumber(void*, int);
 int __fastcall Detour_CommandClassroomState_getOnStageUpperLimite(void*, int);
 decltype(Detour_CommandUserSettings_getOnStageShortOfNumber)* Trampoline_CommandUserSettings_getOnStageShortOfNumber = nullptr;
 decltype(Detour_CommandClassroomState_getOnStageUpperLimite)* Trampoline_CommandClassroomState_getOnStageUpperLimite = nullptr;
-
+*/
 // User32.dll
 // 2313 328 0002B120 SetCursor
+/*
 HCURSOR __stdcall Detour_SetCursor(HCURSOR hCursor);
 decltype(Detour_SetCursor)* Trampoline_SetCursor = nullptr;
-#pragma endregion
+*/
+
+void drawText_impl(QString const& str) {
+	wchar_t wstr[2048]{ 0 };
+	int len = QString_toWCharArray(&str, 0, wstr);
+	wprintf(L"[%d]%s\n", len, wstr);
+	if (wcscmp(wstr, L"你下台了，暂时无法与大家互动") == 0) {
+		//wcscpy(pNotify->string, wstr);
+		//evtNotify.set();
+	}
+}
+
+HH_FUNC_GLOBAL(HCURSOR, WINAPI, SetCursor, HCURSOR hCursor) {
+	printf("in setcursor:%p\n", hCursor);
+	return HH_TRAMPL_FUNC(SetCursor)(hCursor);
+}
+HH_FUNC_DLL(void, __fastcall, QPainter_drawText_21, void* pThis, int edx, QPoint const& p, class QString const& s) {
+	drawText_impl(s);
+	HH_TRAMPL_FUNC(QPainter_drawText_21)(pThis, edx, p, s);
+}
+HH_FUNC_DLL(void, __fastcall, QPainter_drawText_22, void* pThis, int edx, QPointF const& p, class QString const& s) {
+	drawText_impl(s);
+	HH_TRAMPL_FUNC(QPainter_drawText_22)(pThis, edx, p, s);
+}
+HH_FUNC_DLL(void, __fastcall, QPainter_drawText_41, void* pThis, int edx, QPointF const& p, class QString const& s, int x, int y) {
+	drawText_impl(s);
+	HH_TRAMPL_FUNC(QPainter_drawText_41)(pThis, edx, p, s, x, y);
+}
+HH_FUNC_DLL(void, __fastcall, QPainter_drawText_42, void* pThis, int edx, QRect const& r, int i, class QString const& s, class QRect* p) {
+	drawText_impl(s);
+	HH_TRAMPL_FUNC(QPainter_drawText_42)(pThis, edx, r, i, s, p);
+}
+HH_FUNC_DLL(void, __fastcall, QPainter_drawText_31, void* pThis, int edx, QRectF const& r, class QString const& s, class QTextOption const& t) {
+	drawText_impl(s);
+	HH_TRAMPL_FUNC(QPainter_drawText_31)(pThis, edx, r, s, t);
+}
+HH_FUNC_DLL(void, __fastcall, QPainter_drawText_43, void* pThis, int edx, QRectF const& r, int i, class QString const& s, class QRectF* f) {
+	drawText_impl(s);
+	HH_TRAMPL_FUNC(QPainter_drawText_43)(pThis, edx, r, i, s, f);
+
+}
+HH_FUNC_DLL(void, __fastcall, QPainter_drawText_32, void* pThis, int edx, int i, int n, class QString const& s) {
+	drawText_impl(s);
+	HH_TRAMPL_FUNC(QPainter_drawText_32)(pThis, edx, i, n, s);
+}
+HH_FUNC_DLL(void, __fastcall, QPainter_drawText_71, void* pThis, int edx, int i, int n, int t, int j, int l, class QString const& s, class QRect* p) {
+	drawText_impl(s);
+	HH_TRAMPL_FUNC(QPainter_drawText_71)(pThis, edx, i, n, t, j, l, s, p);
+}
+HH_FUNC_DLL(int, __fastcall, CommandUserSettings_getOnStageShortOfNumber, void* pThis, int edx) {
+	int ret = HH_TRAMPL_FUNC(CommandUserSettings_getOnStageShortOfNumber)(pThis, edx);
+	printf("in Detour_CommandUserSettings_getOnStageShortOfNumber: ret=%d", ret);
+	return ret;
+}
+HH_FUNC_DLL(int, __fastcall, CommandClassroomState_getOnStageUpperLimite, void* pThis, int edx) {
+	int ret = HH_TRAMPL_FUNC(CommandClassroomState_getOnStageUpperLimite)(pThis, edx);
+	printf("in Detour_CommandClassroomState_getOnStageUpperLimite: ret=%d", ret);
+	return ret;
+}
+
+HookInfo info[] = {
+	HH_INFO_GLOBAL(SetCursor),
+	HH_INFO_DLL(QPainter_drawText_21,hQt5GuiDll,"?drawText@QPainter@@QAEXABVQPoint@@ABVQString@@@Z"),
+	HH_INFO_DLL(QPainter_drawText_22,hQt5GuiDll,"?drawText@QPainter@@QAEXABVQPointF@@ABVQString@@@Z"),
+	HH_INFO_DLL(QPainter_drawText_41,hQt5GuiDll,"?drawText@QPainter@@QAEXABVQPointF@@ABVQString@@HH@Z"),
+	HH_INFO_DLL(QPainter_drawText_42,hQt5GuiDll,"?drawText@QPainter@@QAEXABVQRect@@HABVQString@@PAV2@@Z"),
+	HH_INFO_DLL(QPainter_drawText_31,hQt5GuiDll,"?drawText@QPainter@@QAEXABVQRectF@@ABVQString@@ABVQTextOption@@@Z"),
+	HH_INFO_DLL(QPainter_drawText_43,hQt5GuiDll,"?drawText@QPainter@@QAEXABVQRectF@@HABVQString@@PAV2@@Z"),
+	HH_INFO_DLL(QPainter_drawText_32,hQt5GuiDll,"?drawText@QPainter@@QAEXHHABVQString@@@Z"),
+	HH_INFO_DLL(QPainter_drawText_71,hQt5GuiDll,"?drawText@QPainter@@QAEXHHHHHABVQString@@PAVQRect@@@Z"),
+
+	HH_INFO_DLL(CommandUserSettings_getOnStageShortOfNumber,hCommEngineDll,"?getOnStageShortOfNumber@CommandUserSettings@@QAEHXZ"),
+	HH_INFO_DLL(CommandClassroomState_getOnStageUpperLimite,hCommEngineDll,"?getOnStageUpperLimite@CommandClassroomState@@QAEHXZ"),
+
+};
 
 template<typename dst_type, typename src_type>
 dst_type pointer_cast(src_type src) {
@@ -215,192 +293,52 @@ void getVersion(LPCWSTR szVersionFile) {
 	}
 }
 
-HMODULE hQt5GuiDll = NULL, hQt5CoreDll = NULL, hCommEngineDll = NULL, hUser32Dll = NULL;
-#define EXTRACTINFO(hModule, funName, decName) { &hModule, decName, &(PVOID&)Trampoline_##funName, (void*)Detour_##funName }
-struct HookInfo {
-	HMODULE* hModule;
-	LPCSTR decoratedName;
-	PVOID* ppTrampoline;
-	PVOID pDetour;
-}info[] = {
-	EXTRACTINFO(hQt5GuiDll, QPainter_drawText_21, "?drawText@QPainter@@QAEXABVQPoint@@ABVQString@@@Z"),
-	EXTRACTINFO(hQt5GuiDll, QPainter_drawText_22, "?drawText@QPainter@@QAEXABVQPointF@@ABVQString@@@Z"),
-	EXTRACTINFO(hQt5GuiDll, QPainter_drawText_41, "?drawText@QPainter@@QAEXABVQPointF@@ABVQString@@HH@Z"),
-	EXTRACTINFO(hQt5GuiDll, QPainter_drawText_42, "?drawText@QPainter@@QAEXABVQRect@@HABVQString@@PAV2@@Z"),
-	EXTRACTINFO(hQt5GuiDll, QPainter_drawText_31, "?drawText@QPainter@@QAEXABVQRectF@@ABVQString@@ABVQTextOption@@@Z"),
-	EXTRACTINFO(hQt5GuiDll, QPainter_drawText_43, "?drawText@QPainter@@QAEXABVQRectF@@HABVQString@@PAV2@@Z"),
-	EXTRACTINFO(hQt5GuiDll, QPainter_drawText_32, "?drawText@QPainter@@QAEXHHABVQString@@@Z"),
-	EXTRACTINFO(hQt5GuiDll, QPainter_drawText_71, "?drawText@QPainter@@QAEXHHHHHABVQString@@PAVQRect@@@Z"),
-	//EXTRACTINFO(hCommEngineDll, CommandUserSettings_getOnStageShortOfNumber, "?getOnStageShortOfNumber@CommandUserSettings@@QAEHXZ"),
-	//EXTRACTINFO(hCommEngineDll, CommandClassroomState_getOnStageUpperLimite, "?getOnStageUpperLimite@CommandClassroomState@@QAEHXZ"),
-	EXTRACTINFO(hUser32Dll, SetCursor, "SetCursor"),
-};
-void GetProcAddrMulti() {
-	for (auto& obj : info) {
-		getProcAddr(*obj.hModule, obj.decoratedName, *obj.ppTrampoline);
-	}
-}
-void DetourAttachMulti() {
-	for (auto& obj : info) {
-		DetourAttach(obj.ppTrampoline, obj.pDetour);
-	}
-}
-void DetourDetachMulti() {
-	for (auto& obj : info) {
-		DetourDetach(obj.ppTrampoline, obj.pDetour);
-	}
-}
-
-#pragma comment(linker,"/section:Shared,rws")
-#pragma data_seg("Shared")
-notifyStruct g_notify{ 0 };
-#pragma data_seg()
-
-enum dllRole {
-	ROLE_NAN,
-	ROLE_CLASSOUT,
-	ROLE_CLASSIN
-} role = ROLE_NAN;
-
-DWORD WINAPI messageThread(LPVOID param) {
-	MSG msg;
-	while (GetMessageW(&msg, NULL, 0, 0)) {
-
-	}
-	return 0;
-}
-
-void drawText_impl(QString const& str) {
-	wchar_t wstr[2048]{ 0 };
-	int len = QString_toWCharArray(&str, 0, wstr);
-	wprintf(L"[%d]%s\n", len, wstr);
-	if (wcscmp(wstr, L"你下台了，暂时无法与大家互动") == 0) {
-		//wcscpy(pNotify->string, wstr);
-		//evtNotify.set();
-	}
-}
 __declspec(dllexport)
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
 	wchar_t moduleName[260]{ 0 };
 	LPCWSTR fileName = NULL;
+	LONG code = 0;
 	switch (ul_reason_for_call)
 	{
 	case DLL_THREAD_ATTACH:
 	case DLL_THREAD_DETACH:
 		break;
 	case DLL_PROCESS_ATTACH:
-		
 		AllocConsole();
 		SetConsoleCtrlHandler(HandlerRoutine, TRUE);
 		freopen("CONIN$", "r", stdin);
 		freopen("CONOUT$", "w", stdout);
 		freopen("CONOUT$", "w", stderr);
 		setlocale(LC_ALL, "");
-		
 
-		GetModuleFileNameW(NULL, moduleName, 260);
-		fileName = PathFindFileNameW(moduleName);
-		if (wcscmp(fileName, L"ClassOut.exe") == 0)
-			role = ROLE_CLASSOUT;
-		else if (wcscmp(fileName, L"ClassIn.exe") == 0)
-			role = ROLE_CLASSIN;
-		else
-			role = ROLE_NAN;
-		wprintf(L"Loaded by: %s,%d\n", fileName, role);
-		switch (role) {
-		case ROLE_CLASSOUT:
+		hQt5CoreDll = LoadLibraryW(L"Qt5Core.dll");
+		hQt5GuiDll = LoadLibraryW(L"Qt5Gui.dll");
+		hCommEngineDll = LoadLibraryW(L"CommEngine.dll");
 
-			break;
-		case ROLE_CLASSIN:
-			hQt5GuiDll = LoadLibraryW(L"Qt5Gui.dll");
-			hQt5CoreDll = LoadLibraryW(L"Qt5Core.dll");
-			hCommEngineDll = LoadLibraryW(L"CommEngine.dll");
-			hUser32Dll = LoadLibraryW(L"User32.dll");
-			getVersion(L"Qt5Gui.dll");
-			getVersion(L"Qt5Core.dll");
-			GetProcAddrMulti();
-			getProcAddr(hQt5CoreDll, "?toWCharArray@QString@@QBEHPA_W@Z", QString_toWCharArray);
-			DetourRestoreAfterWith();
-			DetourTransactionBegin();
-			DetourUpdateThread(GetCurrentThread());
-			DetourAttachMulti();
-			if (DetourTransactionCommit() != NO_ERROR) {
-				printf("detourAttach failed\n");
-			}
-			g_notify.classinPresent = true;
-			break;
-		default:
-			break;
+		GetProcAddrMulti(info);
+		if (code = DetourAttachAllInOne(info) != NO_ERROR) {
+			printf("failed%d\n", code);
 		}
+		else {
+			printf("succeed\n");
+		}
+		QString_toWCharArray = (decltype(QString_toWCharArray))GetProcAddress(hQt5CoreDll, "?toWCharArray@QString@@QBEHPA_W@Z");
 		break;
 	case DLL_PROCESS_DETACH:
-		switch (role) {
-		case ROLE_CLASSOUT:
-
-			break;
-		case ROLE_CLASSIN:
-			DetourTransactionBegin();
-			DetourUpdateThread(GetCurrentThread());
-			DetourDetachMulti();
-			if (DetourTransactionCommit() != NO_ERROR) {
-				printf("detourDetach failed\n");
-			}
-			FreeLibrary(hUser32Dll);
-			FreeLibrary(hQt5CoreDll);
-			FreeLibrary(hQt5GuiDll);
-			FreeLibrary(hCommEngineDll);
-			g_notify.classinPresent = false;
-			break;
-		default:
-			break;
+		if (DetourDetachAllInOne(info) != NO_ERROR) {
+			printf("failed\n");
 		}
+		else {
+			printf("succeed\n");
+		}
+		FreeLibrary(hQt5CoreDll);
+		FreeLibrary(hQt5GuiDll);
+		FreeLibrary(hCommEngineDll);
 		break;
 	}
 	return TRUE;
 }
-#pragma region Detour_Functions
-void __fastcall Detour_QPainter_drawText_21(void* pThis, int edx, QPoint const& p, class QString const& s) {
-	drawText_impl(s);
-	Trampoline_QPainter_drawText_21(pThis, edx, p, s);
-}
-void __fastcall Detour_QPainter_drawText_22(void* pThis, int edx, QPointF const& p, class QString const& s) {
-	drawText_impl(s);
-	Trampoline_QPainter_drawText_22(pThis, edx, p, s);
-}
-void __fastcall Detour_QPainter_drawText_41(void* pThis, int edx, QPointF const& p, class QString const& s, int x, int y) {
-	drawText_impl(s);
-	Trampoline_QPainter_drawText_41(pThis, edx, p, s, x, y);
-}
-void __fastcall Detour_QPainter_drawText_42(void* pThis, int edx, QRect const& r, int i, class QString const& s, class QRect* p) {
-	drawText_impl(s);
-	Trampoline_QPainter_drawText_42(pThis, edx, r, i, s, p);
-}
-void __fastcall Detour_QPainter_drawText_31(void* pThis, int edx, QRectF const& r, class QString const& s, class QTextOption const& t) {
-	drawText_impl(s);
-	Trampoline_QPainter_drawText_31(pThis, edx, r, s, t);
-}
-void __fastcall Detour_QPainter_drawText_43(void* pThis, int edx, QRectF const& r, int i, class QString const& s, class QRectF* f) {
-	drawText_impl(s);
-	Trampoline_QPainter_drawText_43(pThis, edx, r, i, s, f);
-}
-void __fastcall Detour_QPainter_drawText_32(void* pThis, int edx, int i, int n, class QString const& s) {
-	drawText_impl(s);
-	Trampoline_QPainter_drawText_32(pThis, edx, i, n, s);
-}
-void __fastcall Detour_QPainter_drawText_71(void* pThis, int edx, int i, int n, int t, int j, int l, class QString const& s, class QRect* p) {
-	drawText_impl(s);
-	Trampoline_QPainter_drawText_71(pThis, edx, i, n, t, j, l, s, p);
-}
-int __fastcall Detour_CommandUserSettings_getOnStageShortOfNumber(void* pthis, int edx) {
-	int ret = Trampoline_CommandUserSettings_getOnStageShortOfNumber(pthis, edx);
-	printf("in Detour_CommandUserSettings_getOnStageShortOfNumber: ret=%d", ret);
-	return ret;
-}
-int __fastcall Detour_CommandClassroomState_getOnStageUpperLimite(void* pthis, int edx) {
-	int ret = Trampoline_CommandClassroomState_getOnStageUpperLimite(pthis, edx);
-	printf("in Detour_CommandClassroomState_getOnStageUpperLimite: ret=%d", ret);
-	return ret;
-}
+/*
 HCURSOR __stdcall Detour_SetCursor(HCURSOR hCursor)
 {
 	HCURSOR ret;
@@ -424,4 +362,4 @@ HCURSOR __stdcall Detour_SetCursor(HCURSOR hCursor)
 	printf("\n");
 	return ret;
 }
-#pragma endregion
+*/
